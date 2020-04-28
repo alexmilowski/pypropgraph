@@ -16,6 +16,7 @@ def _label_list(spec):
    return labels
 
 def _get_id_properties(schema,labels):
+   node_def = None
    if schema is not None:
       node_defs = schema.find(*labels)
       node_def = node_defs[0] if len(node_defs)>0 else None
@@ -34,7 +35,7 @@ def _create_edge(source, schema, from_id, to_id, directed, labels, edge):
       labels = _label_list(node)
       q.write('MERGE ({label}:{labels}'.format(label=label,labels=':'.join(labels)))
       id_properties = _get_id_properties(schema,labels)
-      if len(id_properties)>0:
+      if id_properties is not None and len(id_properties)>0:
          q.write(' {')
          for index,id_property in enumerate(id_properties):
             if index>0:
@@ -79,6 +80,7 @@ def graph_to_cypher(source, location=None, merge=True):
    if type(source)!=dict:
       source = yaml.load(source,Loader=yaml.Loader)
 
+   schema = None
    schema_source = source.get('~schema')
    if schema_source is not None:
       parser = SchemaParser()
@@ -135,7 +137,7 @@ def graph_to_cypher(source, location=None, merge=True):
       for property in node.keys():
          if property[0]=='~':
             continue
-         if merge and id_property==property:
+         if merge and id_properties is not None and property in id_properties:
             continue
          value = node[property]
          # TODO: quote property name
@@ -162,6 +164,13 @@ def graph_to_cypher(source, location=None, merge=True):
          from_id = edges_spec[0]
          for edge in edges_spec[1]:
             to_id = edge.get('~to')
+            directed = edge.get('~directed',True)
+            labels = _label_list(edge)
+            yield _create_edge(source, schema, from_id, to_id, directed, labels, edge)
+      elif type(edges_spec)==dict:
+         for edge in edges_spec.values():
+            to_id = edge.get('~to')
+            from_id = edge.get('~from')
             directed = edge.get('~directed',True)
             labels = _label_list(edge)
             yield _create_edge(source, schema, from_id, to_id, directed, labels, edge)
