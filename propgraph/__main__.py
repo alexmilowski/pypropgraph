@@ -23,7 +23,7 @@ if __name__ == '__main__':
       sources = args.files
    for source in sources:
       with open(source,'r') if type(source)==str else source as input:
-         graph_data = yaml.load(input,Loader=yaml.Loader)
+         graph_data = yaml.load(input,Loader=yaml.Loader), source if type(source)==str else None
 
          if args.operation=='validate':
             print('Not implemented',file=sys.stderr)
@@ -31,8 +31,7 @@ if __name__ == '__main__':
          elif args.operation=='cypher':
 
             for query in graph_to_cypher(graph_data):
-               print(query)
-               print(';')
+               print(query,end=';\n')
 
          elif args.operation=='load':
             import redis
