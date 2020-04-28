@@ -23,6 +23,15 @@ def _get_id_properties(schema,labels):
 
    return node_def.keys if node_def is not None else None
 
+def _get_property(propdef):
+   name = propdef.get('name')
+   if name is None:
+      raise ValueError("Missing the 'name' key for a property")
+   value = propdef.get('value')
+   if value is None:
+      raise ValueError("Missing the 'value' key for a property")
+   return (name,value)
+
 def _create_edge(source, schema, from_id, to_id, directed, labels, edge):
    from_node = source.get(from_id)
    if from_node is None:
@@ -35,8 +44,8 @@ def _create_edge(source, schema, from_id, to_id, directed, labels, edge):
       labels = _label_list(node)
       q.write('MERGE ({label}:{labels}'.format(label=label,labels=':'.join(labels)))
       id_properties = _get_id_properties(schema,labels)
+      q.write(' {')
       if id_properties is not None and len(id_properties)>0:
-         q.write(' {')
          for index,id_property in enumerate(id_properties):
             if index>0:
                q.write(', ')
@@ -46,8 +55,22 @@ def _create_edge(source, schema, from_id, to_id, directed, labels, edge):
             if type(value)==str:
                value = cypher_literal(value)
             q.write('{property}: {value}'.format(property=id_property,value=value))
-         q.write('}')
-      q.write(')\n')
+      else:
+         first = True
+         for property in node.keys():
+            if property[0]=='~':
+               continue
+            if not first:
+               q.write(', ')
+            first = False
+            value = node.get(property)
+            if type(value)==dict:
+               property, value = _get_property(value)
+            if type(value)==str:
+               value = cypher_literal(value)
+            q.write('{property}: {value}'.format(property=property,value=value))
+
+      q.write('})\n')
    if directed:
       directed_expr = '>'
    else:
@@ -66,7 +89,7 @@ def _create_edge(source, schema, from_id, to_id, directed, labels, edge):
       if type(value)==str:
          value = cypher_literal(value)
       # TODO: escape property name
-      q.write('r.{name} = {value}'.format(name=key,value=value))
+      q.write('r.`{name}` = {value}'.format(name=key,value=value))
    return q.getvalue()
 
 
@@ -140,6 +163,8 @@ def graph_to_cypher(source, location=None, merge=True):
          if merge and id_properties is not None and property in id_properties:
             continue
          value = node[property]
+         if type(value)==dict:
+            property, value = _get_property(value)
          # TODO: quote property name
          if first:
             if merge:
@@ -148,7 +173,7 @@ def graph_to_cypher(source, location=None, merge=True):
             first = False
          else:
             q.write(',\n     ')
-         q.write('n.{property} = '.format(property=property))
+         q.write('n.`{property}` = '.format(property=property))
          if type(value)==str:
             q.write(cypher_literal(value))
          else:
