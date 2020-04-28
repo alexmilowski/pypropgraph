@@ -40,7 +40,29 @@ DIRECTED.2: "->"
 class Schema:
    def __init__(self,description=''):
       self.description = description
+      self.label_index = {}
       self.nodes = []
+
+   def add_node(self,node):
+      for label in node.labels:
+         indexed = self.label_index.get(label,[])
+         if len(indexed)==0:
+            self.label_index[label] = indexed
+         indexed.append(node)
+      self.nodes.append(node)
+
+   def find(self,*labels):
+      indexed = self.label_index.get(labels[0])
+      if indexed is None:
+         return []
+      if len(labels)==1:
+         return indexed
+      label_set = set(labels)
+      candidates = []
+      for node in indexed:
+         if label_set.issubset(node.labels):
+            candidates.append(node)
+      return candidates
 
    def documentation(self,output):
 
@@ -253,7 +275,7 @@ class SchemaParser:
                         edge.description = _decode_literal(facet.children[0].value)
 
 
-         schema.nodes.append(node_def)
+         schema.add_node(node_def)
 
       return schema
 
