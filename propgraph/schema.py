@@ -125,7 +125,7 @@ class NodeDefinition:
    def documentation(self,output):
 
       print('# {}'.format(':'.join(self.labels)),file=output)
-      if len(self.description)>0:
+      if self.description is not None and len(self.description)>0:
          print(file=output)
          print(self.description,file=output)
       print(file=output)
@@ -231,11 +231,18 @@ class SchemaParser:
 
       tree = self.parser.parse(source)
 
-      prolog = tree.children[0]
+      if tree.data=='schema':
+         schema_description = _decode_literal(tree.children[0].children[0].value)
+         schema = Schema(schema_description)
+         schema_children = tree.children[1:]
+      elif tree.data=='node':
+         schema_description = ''
+         schema = Schema(schema_description)
+         schema_children = [tree]
+      else:
+         raise ValueError('Unhandled tree type: '+tree.data)
 
-      schema = Schema(_decode_literal(prolog.children[0]))
-
-      for node in tree.children[1:]:
+      for node in schema_children:
 
          node_description = ''
          labels = list(map(lambda label : label.children[0].value,node.children[0].children))
