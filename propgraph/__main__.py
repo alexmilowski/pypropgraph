@@ -3,6 +3,7 @@ import sys
 import yaml
 
 from propgraph import graph_to_cypher
+from propgraph import SchemaParser
 
 if __name__ == '__main__':
 
@@ -12,7 +13,7 @@ if __name__ == '__main__':
    argparser.add_argument('--password',help='Redis password')
    argparser.add_argument('--show-query',help='Show the cypher queries before they are run.',action='store_true',default=False)
    argparser.add_argument('--graph',help='The graph name',default='test')
-   argparser.add_argument('operation',help='The operation to perform',choices=['validate','cypher','load'])
+   argparser.add_argument('operation',help='The operation to perform',choices=['validate','cypher','load', 'schema.check', 'schema.doc'])
    argparser.add_argument('files',nargs='*',help='The files to process.')
 
    args = argparser.parse_args()
@@ -23,7 +24,11 @@ if __name__ == '__main__':
       sources = args.files
    for source in sources:
       with open(source,'r') if type(source)==str else source as input:
-         graph_data = yaml.load(input,Loader=yaml.Loader), source if type(source)==str else None
+
+         if not args.operation.startswith('schema'):
+            graph_data = yaml.load(input,Loader=yaml.Loader), source if type(source)==str else None
+         else:
+            graph_data = None
 
          if args.operation=='validate':
             print('Not implemented',file=sys.stderr)
@@ -44,3 +49,9 @@ if __name__ == '__main__':
                   print(query)
                   print(';')
                graph.query(query)
+         elif args.operation=='schema.check' or args.operation=='schema.doc':
+            parser = SchemaParser()
+            schema = parser.parse(input)
+
+            if args.operation=='schema.doc':
+               schema.documentation(sys.stdout)
