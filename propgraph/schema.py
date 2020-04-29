@@ -17,8 +17,9 @@ relation_labels: label+
 direction: UNDIRECTED | DIRECTED
 target_nodes: target_node ("," target_node )*
 target_node: label+
-property_name: NAME | STRING
+property_name: NAME | BACKQUOTE_STRING
 
+BACKQUOTE_STRING: /`(?!'').*?(?<!\\)(\\\\)*?`/i
 STRING: /'(?!'').*?(?<!\\)(\\\\)*?'/i
 LONG_STRING: /('''.*?(?<!\\)(\\\\)*?''')/is
 NAME: /[a-zA-Z_][\w\-]*/
