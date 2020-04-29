@@ -1,0 +1,30 @@
+~schema: |
+  (:Component {id})
+  .id = 'the component identifier'
+  .name = 'the component descriptive name'
+  .use = int 'a count of usage'
+  -[:imports]->(:Component) = 'an imported component'
+A:
+ ~label: Component
+ id: 'A'
+ name: 'Component A'
+ use: 12
+ ~edges:
+ - ~to: B
+   ~label: imports
+ - ~to: C
+   ~label: imports
+B:
+ ~label: Component
+ id: 'B'
+ name: 'Component B'
+ use: 6
+C:
+ ~label: Component
+ id: 'C'
+ name: 'Component C'
+ use: 7
+~edges:
+  - ~from: C
+    ~to: B
+    ~label: imports

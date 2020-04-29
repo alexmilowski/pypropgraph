@@ -1,0 +1,25 @@
+A:
+ ~label: Component
+ id: 'A'
+ name: 'Component A'
+ use: 12
+ ~edges:
+ - ~to: B
+   ~label: imports
+ - ~to: C
+   ~label: imports
+B:
+ ~label: Component
+ id: 'B'
+ name: 'Component B'
+ use: 6
+C:
+ ~label: Component
+ id: 'C'
+ name: 'Component C'
+ use: 7
+~edges:
+  e1:
+    ~from: C
+    ~to: B
+    ~label: imports
