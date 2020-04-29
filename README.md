@@ -35,6 +35,8 @@ where `operation` is one of:
    * `validate` - parse and validate the graph
    * `cypher` - generate cypher create/merge statements
    * `load` - load the ontology into a property graph database
+   * `schema.check` - check the syntax of a schema
+   * `schema.doc` - generate Markdown documentation for the schema
 
 If the file is omitted, the command will read from stdin. Otherwise, each
 file specified will be read and operated on in the order they are specified.
