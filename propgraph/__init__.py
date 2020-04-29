@@ -1,5 +1,5 @@
 from .cypher import graph_to_cypher, cypher_literal
-from .schema import SchemaParser
+from .schema import SchemaParser, Schema, NodeDefinition, EdgeDefintion
 
 __all__ = ['graph_to_cypher', 'cypher_literal',
-           'SchemaParser']
+           'SchemaParser','Schema','NodeDefinition','EdgeDefintion']
