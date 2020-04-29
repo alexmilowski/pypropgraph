@@ -6,10 +6,16 @@ The schema format described before has some basic goals:
 
  * a simple syntax for describe the nodes, edges, and properties
  * provide a way to annotate nodes, edges, and properties with documentation
- * describe identity properties on nodes for match/merge queries
+ * a mechanism by which documentation can be generated
+ * a way to describe identity properties on nodes for match/merge queries
 
 While a schema can be used for validation purposes, the lack of node
 labels, properties, or cardinality constraints limits the use in that context.
+
+It is not:
+
+ * a standard
+ * a mechanism sufficient for describing a database layout
 
 ## An illustrative example
 
