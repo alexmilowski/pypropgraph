@@ -259,27 +259,46 @@ with open('graph.yaml','r') as input:
    graph_data = yaml.load(input,Loader=yaml.Loader)
 ```
 
-Once you have loaded the graph YAML, you can generate the cypher statements:
+Once you have loaded the graph YAML, you can read the graph into a sequence
+of item (NodeItem or EdgeRelationItem):
 
 ```python
+import yaml
+from propgraph import read_graph
 
-from propgraph import graph_to_cypher
-
-for query in graph_to_cypher(graph_data):
-   print(query,end=';\n')
+with open('graph.yaml','r') as input:
+   graph_data = yaml.load(input,Loader=yaml.Loader)
+   for item in read_graph(graph_data):
+      print(item)
 ```
 
-The graph can easily be loaded into RedisGraph:
+These items can be turned into cypher merge or create statements:
 
 ```python
+import yaml
+from propgraph import read_graph, graph_to_cypher
+
+with open('graph.yaml','r') as input:
+   graph_data = yaml.load(input,Loader=yaml.Loader)
+   for query in graph_to_cypher(read_graph(graph_data)):
+      print(query,end=';\n')
+```
+
+Finally, the graph can easily be loaded into RedisGraph:
+
+```python
+import yaml
+from propgraph import read_graph, graph_to_cypher
 
 import redis
 from redisgraph import Graph
-r = redis.Redis(host=args.host,port=args.port,password=args.password)
-graph = Graph(args.graph,r)
+r = redis.Redis(host='localhost',port=6379,password='...')
+rg = Graph('test',r)
 
-for query in graph_to_cypher(graph_data):
-   graph.query(query)
+with open('graph.yaml','r') as input:
+   graph_data = yaml.load(input,Loader=yaml.Loader)
+   for query in graph_to_cypher(read_graph(graph_data)):
+      rg.query(query)
 ```
 
 ### Loading Schemas
@@ -335,7 +354,29 @@ schema.documentation(sys.stdout)
 
 ```
 
-### Schema Classes
+### API
+
+Note: incomplete ...
+
+`read_graph(source,location=None,schema=None)`
+
+Reads a graph into a sequence of items
+
+`graph_to_cypher(stream,merge=True)`
+
+Transforms a sequence of items into a sequence of cypher statements
+
+`cypher_for_node(item,merge=True)`
+
+Returns a cypher statement to create a node from a node item.
+
+`cypher_for_edge_relation(item,merge=True)`
+
+Returns a cypher statement to create an edge from a edge relation item.
+
+#### NodeItem
+
+#### EdgeRelationItem
 
 #### SchemaParser
 
