@@ -2,8 +2,7 @@ import argparse
 import sys
 import yaml
 
-from propgraph import graph_to_cypher
-from propgraph import SchemaParser
+from propgraph import read_graph, graph_to_cypher, SchemaParser
 
 if __name__ == '__main__':
 
@@ -35,7 +34,7 @@ if __name__ == '__main__':
 
          elif args.operation=='cypher':
 
-            for query in graph_to_cypher(graph_data):
+            for query in graph_to_cypher(read_graph(graph_data)):
                print(query,end=';\n')
 
          elif args.operation=='load':
@@ -44,7 +43,7 @@ if __name__ == '__main__':
             r = redis.Redis(host=args.host,port=args.port,password=args.password)
             graph = Graph(args.graph,r)
 
-            for query in graph_to_cypher(graph_data):
+            for query in graph_to_cypher(read_graph(graph_data)):
                if args.show_query:
                   print(query)
                   print(';')
