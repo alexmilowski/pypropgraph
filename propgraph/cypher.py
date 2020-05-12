@@ -56,7 +56,7 @@ def _node_properties(node):
       keys.add(name)
    return keys
 
-def _create_edge(source, schema, from_id, to_id, directed, labels, edge):
+def _create_edge(source, schema, from_id, to_id, directed, edge_labels, edge):
    from_node = source.get(from_id)
    if from_node is None:
       raise ValueError('Cannot find node with id '+from_id)
@@ -72,7 +72,7 @@ def _create_edge(source, schema, from_id, to_id, directed, labels, edge):
 
       from_to_id.append((labels,list(map(lambda name: (name,node.get(name)),id_properties))))
 
-   edge_item = EdgeRelationItem(labels,from_to_id[0][0],dict(from_to_id[0][1]),from_to_id[1][0],dict(from_to_id[1][1]),directed,{})
+   edge_item = EdgeRelationItem(edge_labels,from_to_id[0][0],dict(from_to_id[0][1]),from_to_id[1][0],dict(from_to_id[1][1]),directed,{})
    for key in edge.keys():
       if key[0]=='~':
          continue
