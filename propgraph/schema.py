@@ -74,7 +74,7 @@ class Schema:
 
          node.documentation(output)
 
-class EdgeDefintion:
+class EdgeDefinition:
 
    default_datatype = 'string'
 
@@ -89,7 +89,7 @@ class EdgeDefintion:
       self.related.append(set(labels))
 
    def add_property(self,name,datatype=None,description=''):
-      property = (name,datatype if datatype is not None else EdgeDefintion.default_datatype,description)
+      property = (name,datatype if datatype is not None else EdgeDefinition.default_datatype,description)
       self.properties[name] = property
       return property
 
@@ -111,7 +111,7 @@ class NodeDefinition:
       return property
 
    def add_relation(self,labels,directed=True,description='',related=None):
-      edge = EdgeDefintion(labels,directed,description)
+      edge = EdgeDefinition(labels,directed,description)
       if related is not None:
          if isinstance(related,set):
             edge.add_related(related)
