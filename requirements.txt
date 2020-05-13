@@ -1,2 +1,4 @@
 pyyaml
 lark-parser
+redis
+redisgraph
