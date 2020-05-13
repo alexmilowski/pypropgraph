@@ -2,7 +2,7 @@ import argparse
 import sys
 import yaml
 
-from propgraph import read_graph, graph_to_cypher, SchemaParser
+from propgraph import read_graph, graph_to_cypher, SchemaParser, NodeItem, EdgeRelationItem
 
 if __name__ == '__main__':
 
@@ -30,7 +30,27 @@ if __name__ == '__main__':
             graph_data = None
 
          if args.operation=='validate':
-            print('Not implemented',file=sys.stderr)
+            # TODO: support multi-key nodes
+            by_key = dict()
+            by_label = set()
+            for item in read_graph(graph_data):
+               if type(item)==NodeItem:
+                  multi_key = ','.join([str(item.properties[key]) for key in sorted(item.keys)])
+                  by_key[multi_key] = item.labels
+                  for label in item.labels:
+                     by_label.add(label)
+                  by_label.add(':'.join(item.labels))
+               elif type(item)==EdgeRelationItem:
+                  for ids, labels in [(item.from_node,item.from_labels),(item.to_node,item.to_labels)]:
+                     if len(ids)>0:
+                        multi_key = ','.join([str(ids[key]) for key in sorted(ids.keys())])
+                        node = by_key.get(multi_key)
+                        if node is None:
+                           print('Undefined node with properties {}.'.format(str(ids)),file=sys.stderr)
+                     else:
+                        label_key = ':'.join(labels)
+                        if label_key not in by_label:
+                           print('Undefined node with labels {}.'.format(':'.join(labels)),file=sys.stderr)
 
          elif args.operation=='cypher':
 
