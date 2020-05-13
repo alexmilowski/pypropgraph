@@ -59,10 +59,10 @@ def _node_properties(node):
 def _create_edge(source, schema, from_id, to_id, directed, edge_labels, edge):
    from_node = source.get(from_id)
    if from_node is None:
-      raise ValueError('Cannot find node with id '+from_id)
+      raise ValueError('Cannot find source node with id {}, edge {}'.format(from_id,':'.join(edge_labels)))
    to_node = source.get(to_id)
    if to_node is None:
-      raise ValueError('Cannot find node with id '+to_id)
+      raise ValueError('Cannot find target node with id {}, edge {}'.format(to_id,':'.join(edge_labels)))
    from_to_id = []
    for label, id, node in [('from',from_id,from_node),('to',to_id,to_node)]:
       labels = _label_list(node)
@@ -188,6 +188,8 @@ def read_graph(source, location=None,schema=None):
                   fileref = os.path.join(dir,fileref)
                with open(fileref,'r') as input:
                   schema = parser.parse(input)
+      if schema is not None:
+         yield schema
 
    graph_edges = []
    for id in source.keys():
