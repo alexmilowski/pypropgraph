@@ -1,10 +1,11 @@
 import yaml
+import csv
 from io import StringIO
 import os
 
 from .schema import SchemaParser
 
-from typing import NamedTuple
+from typing import NamedTuple, Generator, Iterator
 
 class NodeItem(NamedTuple):
    labels: set
@@ -21,7 +22,7 @@ class EdgeRelationItem(NamedTuple):
    properties: dict
 
 def cypher_literal(value):
-   return "'" + value.replace("'",r"\'") + "'"
+   return "'" + value.replace('\\','\\\\').replace("'",r"\'") + "'"
 
 def _label_list(spec):
    labels = spec.get('~label')
@@ -84,7 +85,7 @@ def _create_edge(source, schema, from_id, to_id, directed, edge_labels, edge):
 def cypher_for_edge_relation(relation,merge=True):
    q = StringIO()
    for label, labels, id_properties in [('from',relation.from_labels,relation.from_node),('to',relation.to_labels,relation.to_node)]:
-      q.write('MERGE ({label}:{labels}'.format(label=label,labels=':'.join(labels)))
+      q.write('MERGE ({label}{labels}'.format(label=label,labels=':' + ':'.join(labels) if len(labels)>0 else ''))
       q.write(' {')
       for index,id_property in enumerate(id_properties.keys()):
          if index>0:
@@ -100,7 +101,7 @@ def cypher_for_edge_relation(relation,merge=True):
       directed_expr = '>'
    else:
       directed_expr = ''
-   q.write('MERGE (from)-[r:{labels}]-{directed}(to)'.format(labels=':'.join(relation.labels),directed=directed_expr))
+   q.write('MERGE (from)-[r{labels}]-{directed}(to)'.format(labels=':' + ':'.join(relation.labels) if len(relation.labels)>0 else '',directed=directed_expr))
    first = True
    for key in relation.properties.keys():
       if first:
@@ -118,7 +119,7 @@ def cypher_for_node(node,merge=True):
 
    q = StringIO()
    if merge:
-      q.write('MERGE (n:{labels}'.format(labels=':'.join(node.labels)))
+      q.write('MERGE (n{labels}'.format(labels=':'+':'.join(node.labels) if len(node.labels)>0 else ''))
       if len(node.keys)>0:
          q.write(' {')
          for index,id_property in enumerate(node.keys):
@@ -133,7 +134,7 @@ def cypher_for_node(node,merge=True):
          q.write('}')
       q.write(')')
    else:
-      q.write('CREATE (n:{labels})'.format(labels=':'.join(labels)))
+      q.write('CREATE (n:{labels})'.format(labels=':'+':'.join(node.labels) if len(node.labels)>0 else ''))
 
    first = True
    for property in node.properties.keys():
@@ -157,15 +158,72 @@ def cypher_for_node(node,merge=True):
          q.write(str(value))
    return q.getvalue()
 
+def cypher_for_item(item,merge=True):
+   if type(item)==NodeItem:
+      return cypher_for_node(item,merge=merge)
+   elif type(item)==EdgeRelationItem:
+      return cypher_for_edge_relation(item,merge=merge)
+
 def graph_to_cypher(stream, merge=True):
-   for item in stream:
-      if type(item)==NodeItem:
-         yield cypher_for_node(item,merge=merge)
-      elif type(item)==EdgeRelationItem:
-         yield cypher_for_edge_relation(item,merge=merge)
+   if isinstance(item, Generator) or isinstance(item, Iterator):
+      for item in stream:
+         yield cypher_for_item(item,merge=merge)
+   else:
+      yield cypher_for_item(item,merge=merge)
 
-def read_graph(source, location=None,schema=None):
+def _read_property_defs(fieldnames):
+   property_defs = {}
+   for property in fieldnames:
+      if property[0]=='~':
+         continue
+      name, *typeinfo = property.split(':')
+      type_name = typeinfo[0] if len(typeinfo)>0 else 'String'
+      if type_name=='Int':
+         type_func = int
+      elif type_name=='Float':
+         type_func = float
+      else:
+         type_func = str
+      property_defs[property] = (name,type_func)
+   return property_defs
 
+def read_csv(source, location=None, schema=None, kind=None):
+   reader = csv.DictReader(source,delimiter=',',quotechar='"')
+   is_node = kind=='node'
+   keys = set(['id'])
+   property_defs = None
+   for row in reader:
+      if kind is None:
+         if '~from' in row:
+            is_node = False
+         else:
+            is_node = True
+      if property_defs is None:
+         property_defs = _read_property_defs(reader.fieldnames)
+      if is_node:
+         labels = set([row['~label']])
+         properties = { 'id' : row['~id']}
+         for property in property_defs:
+            property_def = property_defs[property]
+            properties[property_def[0]] = property_def[1](row[property])
+         yield NodeItem(labels,keys,properties)
+      else:
+         properties = { 'id' : row['~id']}
+         labels = set([row['~label']])
+         for property in property_defs:
+            property_def = property_defs[property]
+            properties[property_def[0]] = property_def[1](row[property])
+         yield EdgeRelationItem(labels,set(),{'id': row['~from']},set(),{'id': row['~to']},True,properties)
+
+
+def read_graph(source, location=None,schema=None,format='yaml',kind=None):
+
+   if format == 'csv':
+      for item in read_csv(source, location=location, schema=schema,kind=kind):
+         yield item
+      return
+   elif format != 'yaml':
+      raise ValueError('Unrecognized format {}'.format(format))
    location = None
    if type(source)==tuple:
       location = source[1]
