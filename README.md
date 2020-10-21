@@ -120,6 +120,29 @@ Funky:
      value: 42
 ```
 
+Node can specify an edge via a label and enumerate the target nodes and edge
+properties:
+
+
+```YAML
+A:
+  id: 'A'
+  :child:
+    - ~to: B
+      use: 1209
+    - ~to: C
+      use: 432
+B:
+  id: 'B'
+  :child:
+     e1:
+        ~to: C
+        use: 128
+C:
+  id: 'C'
+```
+
+
 Nodes can also specify a set of edges that originate at the node via the `~edges`
 key. The edges are specified as a list or key labeled set:
 
@@ -170,6 +193,28 @@ C:
     ~label: child
     use: 128
 ```
+
+Alternatively, you can specify a label for the edge and enumerate the edges associated with that label:
+
+```YAML
+A:
+  id: 'A'
+B:
+  id: 'B'
+C:
+  id: 'C'
+:child:
+  - ~from: A
+    ~to: B
+    use: 1209
+  - ~from: A
+    ~to: C
+    use: 432
+  - ~from: B
+    ~to: C
+    use: 128
+```
+
 
 ### Schemas
 
