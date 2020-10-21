@@ -215,6 +215,16 @@ C:
     use: 128
 ```
 
+## Label and Identity Inference
+
+Reusing the '@type' and '@id' properties from [JSON-LD](https://json-ld.org),
+if these properties are specified on a node, then the following inferences
+can be optionally applied:
+
+ * The value of @type will turn into a node label
+ * The value of @id will be used as the key for matching the node
+
+ Otherwise, labels and identity must be accomplished via the schema.
 
 ### Schemas
 
