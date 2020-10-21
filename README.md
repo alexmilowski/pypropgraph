@@ -51,6 +51,7 @@ The following options can be specified for connecting to the database:
  * `--port {port}` - the port, defaults to 6379
  * `--password {password}` - the database password, default is no password
  * `--graph {key}` - the graph key, defaults to "test"
+ * `--infer` - infer identity and labels from @id and @type, respectively
 
 Adding the `--show-query` option will allow you to see the Cypher statements as
 they are executed.
@@ -96,8 +97,36 @@ C:
     ~label: imports
 ```
 
-when a schema is specified via `~schema`, the properties that establish
+
+When a schema is specified via `~schema`, the properties that establish
 the node's identity can be specified.
+
+Alternatively, we can use inferencing and the edge label format:
+
+```YAML
+A:
+ @type: Component
+ @id: 'A'
+ name: 'Component A'
+ use: 12
+ :imports:
+ - ~to: B
+ - ~to: C
+B:
+ @type: Component
+ @id: 'B'
+ name: 'Component B'
+ use: 6
+C:
+ @type: Component
+ @id: 'C'
+ name: 'Component C'
+ use: 7
+:imports:
+ - ~from: C
+   ~to: B
+```
+
 
 ### Nodes
 
