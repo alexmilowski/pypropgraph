@@ -12,6 +12,7 @@ if __name__ == '__main__':
    argparser.add_argument('--password',help='Redis password')
    argparser.add_argument('--show-query',help='Show the cypher queries before they are run.',action='store_true',default=False)
    argparser.add_argument('--show-property',help='A property to display as a progress indicator')
+   argparser.add_argument('--infer',help='Infer labels and keys from @type and @id',action='store_true',default=False)
    argparser.add_argument('--single-line',help='Show progress indicator as single line',action='store_true',default=False)
    argparser.add_argument('--graph',help='The graph name',default='test')
    argparser.add_argument('--format',help='The input format',default='yaml',choices=['yaml','csv'])
@@ -37,7 +38,7 @@ if __name__ == '__main__':
             # TODO: support multi-key nodes
             by_key = dict()
             by_label = set()
-            for item in read_graph(input,format=args.format):
+            for item in read_graph(input,format=args.format,infer=args.infer):
                if type(item)==NodeItem:
                   multi_key = ','.join([str(item.properties[key]) for key in sorted(item.keys)])
                   by_key[multi_key] = item.labels
@@ -58,7 +59,7 @@ if __name__ == '__main__':
 
          elif args.operation=='cypher':
 
-            for query in graph_to_cypher(read_graph(input,format=args.format)):
+            for query in graph_to_cypher(read_graph(input,format=args.format,infer=args.infer)):
                print(query,end=';\n')
 
          elif args.operation=='load':
@@ -69,9 +70,11 @@ if __name__ == '__main__':
 
             item_count = 0
 
-            for item in read_graph(input,format=args.format):
+            for item in read_graph(input,format=args.format,infer=args.infer):
                item_count += 1
                query = cypher_for_item(item)
+               if query is None:
+                  continue
                if args.show_query:
                   print(query)
                   print(';')
@@ -85,7 +88,6 @@ if __name__ == '__main__':
                   print('Failed query:')
                   print(query)
                   raise err
-            print()
          elif args.operation=='schema.check' or args.operation=='schema.doc':
             parser = SchemaParser()
             schema = parser.parse(input)

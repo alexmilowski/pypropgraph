@@ -53,6 +53,8 @@ class Schema:
       self.nodes.append(node)
 
    def find(self,*labels):
+      if len(labels)==0:
+         return []
       indexed = self.label_index.get(labels[0])
       if indexed is None:
          return []

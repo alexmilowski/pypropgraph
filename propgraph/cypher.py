@@ -24,21 +24,24 @@ class EdgeRelationItem(NamedTuple):
 def cypher_literal(value):
    return "'" + value.replace('\\','\\\\').replace("'",r"\'") + "'"
 
-def _label_list(spec):
+def _label_set(spec,infer=False):
    labels = spec.get('~label')
+   if infer:
+      type_label = spec.get('@type')
+      if type_label is not None:
+         labels = labels + [type_label] if labels is not None else [type_label]
    if labels is None:
-      labels = set()
-   if type(labels)!=list:
-      labels = set([labels])
-   return set(labels)
+      return set()
 
-def _get_id_properties(schema,labels):
+   return set(labels) if type(labels)==list else set([labels])
+
+def _get_id_properties(schema,labels,infer=False):
    node_def = None
    if schema is not None:
       node_defs = schema.find(*labels)
       node_def = node_defs[0] if len(node_defs)>0 else None
 
-   return node_def.keys if node_def is not None else set()
+   return node_def.keys if node_def is not None else (set(['@id']) if infer else set())
 
 def _get_property(propdef):
    name = propdef.get('name')
@@ -50,14 +53,18 @@ def _get_property(propdef):
    return (name,value)
 
 def _node_properties(node):
-   keys = set()
    for name in node.keys():
-      if name[0]=='~':
+      if name[0]=='~' or name[0]==':':
          continue
-      keys.add(name)
-   return keys
+      yield name
 
-def _create_edge(source, schema, from_id, to_id, directed, edge_labels, edge):
+def _node_edge_labels(node):
+   for name in node.keys():
+      if name[0]==':':
+         yield name
+
+
+def _create_edge(source, schema, from_id, to_id, directed, edge_labels, edge, infer=False):
    from_node = source.get(from_id)
    if from_node is None:
       raise ValueError('Cannot find source node with id {}, edge {}'.format(from_id,':'.join(edge_labels)))
@@ -66,10 +73,10 @@ def _create_edge(source, schema, from_id, to_id, directed, edge_labels, edge):
       raise ValueError('Cannot find target node with id {}, edge {}'.format(to_id,':'.join(edge_labels)))
    from_to_id = []
    for label, id, node in [('from',from_id,from_node),('to',to_id,to_node)]:
-      labels = _label_list(node)
-      id_properties = _get_id_properties(schema,labels)
+      labels = _label_set(node,infer)
+      id_properties = _get_id_properties(schema,labels,infer=infer)
       if id_properties is None or len(id_properties)==0:
-         id_properties = _node_properties(node)
+         id_properties = set(_node_properties(node))
 
       from_to_id.append((labels,list(map(lambda name: (name,node.get(name)),id_properties))))
 
@@ -95,7 +102,7 @@ def cypher_for_edge_relation(relation,merge=True):
             raise ValueError('Node does not have id property {property} value'.format(property=id_property))
          if type(value)==str:
             value = cypher_literal(value)
-         q.write('{property}: {value}'.format(property=id_property,value=value))
+         q.write('`{property}`: {value}'.format(property=id_property,value=value))
       q.write('})\n')
    if relation.directed:
       directed_expr = '>'
@@ -125,12 +132,12 @@ def cypher_for_node(node,merge=True):
          for index,id_property in enumerate(node.keys):
             value = node.properties.get(id_property)
             if value is None:
-               raise ValueError('Node {id} is missing id property {id_property}'.format(id=id,id_property=id_property))
+               raise ValueError('Node is missing id property {id_property}'.format(id_property=id_property))
             if type(value)==str:
                value = cypher_literal(value)
             if index>0:
                q.write(', ')
-            q.write('{id_property}: {value}'.format(id_property=id_property,value=value))
+            q.write('`{id_property}`: {value}'.format(id_property=id_property,value=value))
          q.write('}')
       q.write(')')
    else:
@@ -165,11 +172,11 @@ def cypher_for_item(item,merge=True):
       return cypher_for_edge_relation(item,merge=merge)
 
 def graph_to_cypher(stream, merge=True):
-   if isinstance(item, Generator) or isinstance(item, Iterator):
+   if isinstance(stream, Generator) or isinstance(stream, Iterator):
       for item in stream:
          yield cypher_for_item(item,merge=merge)
    else:
-      yield cypher_for_item(item,merge=merge)
+      yield cypher_for_item(stream,merge=merge)
 
 def _read_property_defs(fieldnames):
    property_defs = {}
@@ -216,7 +223,7 @@ def read_csv(source, location=None, schema=None, kind=None):
          yield EdgeRelationItem(labels,set(),{'id': row['~from']},set(),{'id': row['~to']},True,properties)
 
 
-def read_graph(source, location=None,schema=None,format='yaml',kind=None):
+def read_graph(source, location=None,schema=None,format='yaml',kind=None,infer=False):
 
    if format == 'csv':
       for item in read_csv(source, location=location, schema=schema,kind=kind):
@@ -252,8 +259,10 @@ def read_graph(source, location=None,schema=None,format='yaml',kind=None):
    graph_edges = []
    for id in source.keys():
       if id == '~edges':
-         graph_edges.append(source[id])
+         graph_edges.append((source[id],None,None))
          continue
+      if id[0] == ':':
+         graph_edges.append((source[id],id[1:],None))
       if id[0] == '~':
          continue
 
@@ -261,11 +270,14 @@ def read_graph(source, location=None,schema=None,format='yaml',kind=None):
 
       edges = node.get('~edges')
       if edges is not None:
-         graph_edges.append((id,edges))
+         graph_edges.append((edges,None,id))
 
-      labels = _label_list(node)
+      for label in _node_edge_labels(node):
+         graph_edges.append((node[label],label[1:],id))
 
-      keys = _get_id_properties(schema,labels)
+      labels = _label_set(node,infer=infer)
+
+      keys = _get_id_properties(schema,labels,infer=infer)
 
       properties = {}
 
@@ -280,29 +292,25 @@ def read_graph(source, location=None,schema=None,format='yaml',kind=None):
 
       yield NodeItem(labels,keys,properties)
 
-   for edges_spec in graph_edges:
-      if type(edges_spec)==tuple:
-         # node specific edges
-         from_id = edges_spec[0]
-         for edge in edges_spec[1]:
-            to_id = edge.get('~to')
-            directed = edge.get('~directed',True)
-            labels = _label_list(edge)
-            yield _create_edge(source, schema, from_id, to_id, directed, labels, edge)
-      elif type(edges_spec)==dict:
-         for edge in edges_spec.values():
-            to_id = edge.get('~to')
+   for edges, label, from_id in graph_edges:
+      for edge in edges.values() if type(edges)==dict else edges:
+         to_id = edge.get('~to')
+         if to_id is None:
+            raise ValueError('Missing target node (~to)')
+
+         directed = edge.get('~directed',True)
+
+         labels = _label_set(edge)
+         if from_id is None:
             from_id = edge.get('~from')
-            directed = edge.get('~directed',True)
-            labels = _label_list(edge)
-            yield _create_edge(source, schema, from_id, to_id, directed, labels, edge)
-      else:
-         for edge in edges_spec:
-            to_id = edge.get('~to')
-            from_id = edge.get('~from')
-            directed = edge.get('~directed',True)
-            labels = _label_list(edge)
-            yield _create_edge(source, schema, from_id, to_id, directed, labels, edge)
+
+         if from_id is None:
+            raise ValueError('Missing source node (~from)')
+
+         if label is not None:
+            labels.add(label)
+
+         yield _create_edge(source, schema, from_id, to_id, directed, labels, edge, infer=infer)
 
 if __name__ == '__main__':
    import sys
