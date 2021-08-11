@@ -293,7 +293,10 @@ def read_graph(source, location=None,schema=None,format='yaml',kind=None,infer=F
       yield NodeItem(labels,keys,properties)
 
    for edges, label, from_id in graph_edges:
-      for edge in edges.values() if type(edges)==dict else edges:
+      for edge in (edges.values() if '~to' not in edges else [edges]) if type(edges)==dict else edges:
+      #for edge in edges.values() if type(edges)==dict else edges:
+         if type(edge)!=dict:
+            raise ValueError(f'Invalid edge specification {edge} for node {from_id}')
          to_id = edge.get('~to')
          if to_id is None:
             raise ValueError('Missing target node (~to)')
