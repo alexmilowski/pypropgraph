@@ -55,7 +55,10 @@ class Schema:
    def find(self,*labels):
       if len(labels)==0:
          return []
-      indexed = self.label_index.get(labels[0])
+      for label in labels:
+         indexed = self.label_index.get(label)
+         if indexed is not None:
+            break
       if indexed is None:
          return []
       if len(labels)==1:
@@ -63,7 +66,7 @@ class Schema:
       label_set = set(labels)
       candidates = []
       for node in indexed:
-         if label_set.issubset(node.labels):
+         if node.labels.issubset(label_set):
             candidates.append(node)
       return candidates
 
