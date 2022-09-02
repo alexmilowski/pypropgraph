@@ -109,17 +109,18 @@ def cypher_for_edge_relation(relation,merge=True):
    else:
       directed_expr = ''
    q.write('MERGE (from)-[r{labels}]-{directed}(to)'.format(labels=':' + ':'.join(relation.labels) if len(relation.labels)>0 else '',directed=directed_expr))
-   first = True
-   for key in relation.properties.keys():
-      if first:
-         q.write('\n ON CREATE\n SET ')
-         first = False
-      else:
-         q.write(',\n     ')
-      value = relation.properties.get(key)
-      if type(value)==str:
-         value = cypher_literal(value)
-      q.write('r.`{name}` = {value}'.format(name=key,value=value))
+   for condition in ['CREATE','MATCH'] if merge else ['CREATE']:
+      first = True
+      for key in relation.properties.keys():
+         if first:
+            q.write(f'\n ON {condition}\n SET ')
+            first = False
+         else:
+            q.write(',\n     ')
+         value = relation.properties.get(key)
+         if type(value)==str:
+            value = cypher_literal(value)
+         q.write('r.`{name}` = {value}'.format(name=key,value=value))
    return q.getvalue()
 
 def cypher_for_node(node,merge=True):
@@ -143,26 +144,27 @@ def cypher_for_node(node,merge=True):
    else:
       q.write('CREATE (n:{labels})'.format(labels=':'+':'.join(node.labels) if len(node.labels)>0 else ''))
 
-   first = True
-   for property in node.properties.keys():
-      if merge and property in node.keys:
-         continue
-      value = node.properties[property]
-      if type(value)==dict:
-         property, value = _get_property(value)
-      # TODO: quote property name
-      if first:
-         if merge:
-            q.write('\n ON CREATE\n')
-         q.write(' SET ')
-         first = False
-      else:
-         q.write(',\n     ')
-      q.write('n.`{property}` = '.format(property=property))
-      if type(value)==str:
-         q.write(cypher_literal(value))
-      else:
-         q.write(str(value))
+   for condition in ['CREATE','MATCH'] if merge else ['CREATE']:
+      first = True
+      for property in node.properties.keys():
+         if merge and property in node.keys:
+            continue
+         value = node.properties[property]
+         if type(value)==dict:
+            property, value = _get_property(value)
+         # TODO: quote property name
+         if first:
+            if merge:
+               q.write(f'\n ON {condition}\n')
+            q.write(' SET ')
+            first = False
+         else:
+            q.write(',\n     ')
+         q.write('n.`{property}` = '.format(property=property))
+         if type(value)==str:
+            q.write(cypher_literal(value))
+         else:
+            q.write(str(value))
    return q.getvalue()
 
 def cypher_for_item(item,merge=True):
