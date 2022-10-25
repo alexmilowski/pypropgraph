@@ -6,7 +6,7 @@ DESCRIPTION=`python -c "import propgraph; print(propgraph.__doc__)"`
 REQUIRES=`python -c "list(map(print,['\t'+line.strip() for line in open('requirements.txt', 'r').readlines()]))"`
 cat <<EOF > setup.cfg
 [metadata]
-name = propgraph
+name = pypropgraph
 version = ${VERSION}
 author = ${AUTHOR}
 author_email = ${EMAIL}
@@ -17,7 +17,7 @@ keywords=
    cypher
    property
    graph
-   
+
 [options]
 packages =
    propgraph
