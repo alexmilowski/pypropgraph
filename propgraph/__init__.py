@@ -1,5 +1,5 @@
 """A property graphs library for importing and generating cypher in python"""
-__version__=(0,5,0)
+__version__=(0,5,1)
 __author__='Alex Miłowski'
 __author_email__='alex@milowski.com'
 
