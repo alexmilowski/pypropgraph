@@ -64,7 +64,7 @@ if __name__ == '__main__':
 
          elif args.operation=='load':
             import redis
-            from redisgraph import Graph
+            from redis.commands.graph import Graph
             r = redis.Redis(host=args.host,port=args.port,password=args.password)
             graph = Graph(args.graph,r)
 
