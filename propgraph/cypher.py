@@ -306,16 +306,15 @@ def read_graph(source, location=None,schema=None,format='yaml',kind=None,infer=F
          directed = edge.get('~directed',True)
 
          labels = _label_set(edge)
-         if from_id is None:
-            from_id = edge.get('~from')
+         edge_from_id = from_id if from_id is not None else edge.get('~from')
 
-         if from_id is None:
+         if edge_from_id is None:
             raise ValueError('Missing source node (~from)')
 
          if label is not None:
             labels.add(label)
 
-         yield _create_edge(source, schema, from_id, to_id, directed, labels, edge, infer=infer)
+         yield _create_edge(source, schema, edge_from_id, to_id, directed, labels, edge, infer=infer)
 
 if __name__ == '__main__':
    import sys
