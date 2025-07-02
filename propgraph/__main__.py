@@ -64,9 +64,9 @@ if __name__ == '__main__':
 
          elif args.operation=='load':
             import redis
-            from redis.commands.graph import Graph
             r = redis.Redis(host=args.host,port=args.port,password=args.password)
-            graph = Graph(args.graph,r)
+            def run_query(q):
+               return r.execute_command('GRAPH.QUERY',args.graph,q)
 
             item_count = 0
 
@@ -83,7 +83,7 @@ if __name__ == '__main__':
                   if value is not None:
                      print('({}) {}'.format(str(item_count),value),end='\r' if args.single_line else '\n')
                try:
-                  graph.query(query)
+                  run_query(query)
                except redis.exceptions.ResponseError as err:
                   print('Failed query:')
                   print(query)
