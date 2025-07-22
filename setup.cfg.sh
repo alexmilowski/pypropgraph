@@ -32,4 +32,9 @@ ${REQUIRES}
 [options.package_data]
 * = *.json, *.yaml, *.flow
 
+[options.extras_require]
+redis = 
+   redis
+falkordb =
+   FalkorDB
 EOF

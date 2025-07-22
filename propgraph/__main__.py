@@ -1,21 +1,25 @@
 import argparse
+import os
 import sys
+from typing import Any
 import yaml
 
 from propgraph import read_graph, graph_to_cypher, cypher_for_item, SchemaParser, NodeItem, EdgeRelationItem
+from .util import stringify_param_value
 
-if __name__ == '__main__':
-
+def main():
    argparser = argparse.ArgumentParser(description='propgraph')
-   argparser.add_argument('--host',help='Redis host',default='0.0.0.0')
-   argparser.add_argument('--port',help='Redis port',type=int,default=6379)
-   argparser.add_argument('--password',help='Redis password')
+   argparser.add_argument('--host',help='The database host (defaults to 0.0.0.0)',default='0.0.0.0')
+   argparser.add_argument('--port',help='The database port (defaults to 6379)',type=int,default=6379)
+   argparser.add_argument('--password',help='The database password (or DBPASSWORD environment variable)')
+   argparser.add_argument('--username',help='The database username (or DBUSER environment variable)')
    argparser.add_argument('--show-query',help='Show the cypher queries before they are run.',action='store_true',default=False)
    argparser.add_argument('--show-property',help='A property to display as a progress indicator')
    argparser.add_argument('--infer',help='Infer labels and keys from @type and @id',action='store_true',default=False)
    argparser.add_argument('--single-line',help='Show progress indicator as single line',action='store_true',default=False)
    argparser.add_argument('--graph',help='The graph name',default='test')
-   argparser.add_argument('--format',help='The input format',default='yaml',choices=['yaml','csv'])
+   argparser.add_argument('--database',help='The database type (defaults to falkor)',default='falkordb',choices=['redis','falkordb'])
+   argparser.add_argument('--format',help='The input format (defaults to yaml)',default='yaml',choices=['yaml','csv'])
    argparser.add_argument('operation',help='The operation to perform',choices=['validate','cypher','load', 'schema.check', 'schema.doc'])
    argparser.add_argument('files',nargs='*',help='The files to process.')
 
@@ -27,12 +31,6 @@ if __name__ == '__main__':
       sources = args.files
    for source in sources:
       with open(source,'r') if type(source)==str else source as input:
-
-         # if not args.operation.startswith('schema'):
-         #    if args
-         #    graph_data = yaml.load(input,Loader=yaml.Loader), source if type(source)==str else None
-         # else:
-         #    graph_data = None
 
          if args.operation=='validate':
             # TODO: support multi-key nodes
@@ -63,10 +61,34 @@ if __name__ == '__main__':
                print(query,end=';\n')
 
          elif args.operation=='load':
-            import redis
-            r = redis.Redis(host=args.host,port=args.port,password=args.password)
-            def run_query(q):
-               return r.execute_command('GRAPH.QUERY',args.graph,q)
+            password = args.password if args.password else os.environ.get('DBPASSWORD')
+            username = args.username if args.username else os.environ.get('DBUSER')
+            match args.database:
+               case 'falkordb':
+                  try:
+                     import falkordb
+                  except ModuleNotFoundError:
+                     print('redis module was not installed. Install with: pip install pypropgraph[falkordb]',file=sys.stderr)
+                     sys.exit(1)
+                  db = falkordb.FalkorDB(host=args.host,port=args.port,username=username,password=password)
+                  graph = db.select_graph(args.graph)
+                  def run_query(q: str, params: dict[str,Any] | None = None):
+                     return graph.query(q,params)
+               case 'redis':
+                  try:
+                     import redis
+                  except ModuleNotFoundError:
+                     print('redis module was not installed. Install with: pip install pypropgraph[redis]',file=sys.stderr)
+                     sys.exit(1)
+                  db = redis.Redis(host=args.host,port=args.port,username=username,password=password)
+                  # Note: a hack for backwards compatibility since RedisGraph is no longer a product
+                  def run_query(q: str, params: dict[str,Any] | None = None):
+                     if params:
+                        params_header = "CYPHER "
+                        for key, value in params.items():
+                              params_header += str(key) + "=" + stringify_param_value(value) + " "
+                        q = params_header + q
+                     return db.execute_command('GRAPH.QUERY',args.graph,q)
 
             item_count = 0
 
@@ -84,13 +106,18 @@ if __name__ == '__main__':
                      print('({}) {}'.format(str(item_count),value),end='\r' if args.single_line else '\n')
                try:
                   run_query(query)
-               except redis.exceptions.ResponseError as err:
-                  print('Failed query:')
-                  print(query)
-                  raise err
+               except Exception as err:
+                  print(f'Failed query:\n{query}',file=sys.stderr)
+                  print(err,file=sys.stderr)
+                  sys.exit(1)
+
          elif args.operation=='schema.check' or args.operation=='schema.doc':
             parser = SchemaParser()
             schema = parser.parse(input)
 
             if args.operation=='schema.doc':
                schema.documentation(sys.stdout)
+
+if __name__ == '__main__':
+
+   main()
