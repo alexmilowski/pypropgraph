@@ -2,8 +2,9 @@ import yaml
 import csv
 from io import StringIO
 import os
+from typing import TextIO, Any
 
-from .schema import SchemaParser
+from .schema import SchemaParser, Schema
 
 from typing import NamedTuple, Generator, Iterator
 
@@ -35,13 +36,13 @@ def _label_set(spec,infer=False):
 
    return set(labels) if type(labels)==list else set([labels])
 
-def _get_id_properties(schema,labels,infer=False):
+def _get_id_properties(schema: Schema, labels : set[str], infer: bool = False, default_key: str = "@id"):
    node_def = None
    if schema is not None:
       node_defs = schema.find(*labels)
       node_def = node_defs[0] if len(node_defs)>0 else None
 
-   return node_def.keys if node_def is not None else (set(['@id']) if infer else set())
+   return node_def.keys if node_def is not None else (set([default_key]) if infer else set())
 
 def _get_property(propdef):
    name = propdef.get('name')
@@ -64,7 +65,7 @@ def _node_edge_labels(node):
          yield name
 
 
-def _create_edge(source, schema, from_id, to_id, directed, edge_labels, edge, infer=False):
+def _create_edge(source: TextIO, schema: Schema, from_id: str, to_id: str, directed: bool, edge_labels: set[str], edge : dict[str,Any], infer=False, default_key: str = "@id"):
    from_node = source.get(from_id)
    if from_node is None:
       raise ValueError('Cannot find source node with id {}, edge {}'.format(from_id,':'.join(edge_labels)))
@@ -74,7 +75,7 @@ def _create_edge(source, schema, from_id, to_id, directed, edge_labels, edge, in
    from_to_id = []
    for label, id, node in [('from',from_id,from_node),('to',to_id,to_node)]:
       labels = _label_set(node,infer)
-      id_properties = _get_id_properties(schema,labels,infer=infer)
+      id_properties = _get_id_properties(schema, labels, infer=infer, default_key=default_key)
       if id_properties is None or len(id_properties)==0:
          id_properties = set(_node_properties(node))
 
@@ -225,7 +226,7 @@ def read_csv(source, location=None, schema=None, kind=None):
          yield EdgeRelationItem(labels,set(),{'id': row['~from']},set(),{'id': row['~to']},True,properties)
 
 
-def read_graph(source, location=None,schema=None,format='yaml',kind=None,infer=False):
+def read_graph(source: TextIO, location: str = None, schema: Schema = None, format: str = 'yaml', kind: str = None, infer: bool = False, default_key: str = "@id"):
 
    if format == 'csv':
       for item in read_csv(source, location=location, schema=schema,kind=kind):
@@ -279,7 +280,7 @@ def read_graph(source, location=None,schema=None,format='yaml',kind=None,infer=F
 
       labels = _label_set(node,infer=infer)
 
-      keys = _get_id_properties(schema,labels,infer=infer)
+      keys = _get_id_properties(schema, labels, infer=infer, default_key=default_key)
 
       properties = {}
 
@@ -314,7 +315,7 @@ def read_graph(source, location=None,schema=None,format='yaml',kind=None,infer=F
          if label is not None:
             labels.add(label)
 
-         yield _create_edge(source, schema, edge_from_id, to_id, directed, labels, edge, infer=infer)
+         yield _create_edge(source, schema, edge_from_id, to_id, directed, labels, edge, infer=infer, default_key=default_key)
 
 if __name__ == '__main__':
    import sys

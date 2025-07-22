@@ -4,8 +4,17 @@ import sys
 from typing import Any
 import yaml
 
-from propgraph import read_graph, graph_to_cypher, cypher_for_item, SchemaParser, NodeItem, EdgeRelationItem
+from propgraph import read_graph, graph_to_cypher, cypher_for_item, SchemaParser, Schema, NodeDefinition, NodeItem, EdgeRelationItem
 from .util import stringify_param_value
+
+def generate_schema(labels : set[str],keys : dict[str,str]):
+   schema = Schema()
+   default_key = keys.get('',{'@id'})
+   for label in labels:
+      keys = keys.get(label,default_key)
+      node_def = NodeDefinition(labels={label},keys=keys)
+      schema.add_node(node_def)
+   return schema
 
 def main():
    argparser = argparse.ArgumentParser(description='propgraph')
@@ -20,6 +29,9 @@ def main():
    argparser.add_argument('--graph',help='The graph name',default='test')
    argparser.add_argument('--database',help='The database type (defaults to falkor)',default='falkordb',choices=['redis','falkordb'])
    argparser.add_argument('--format',help='The input format (defaults to yaml)',default='yaml',choices=['yaml','csv'])
+   argparser.add_argument('--schema',help='A schema to use for the graph')
+   argparser.add_argument('--labels',help='A comma separate list of node labels')
+   argparser.add_argument('--keys',help='A comma separate list of node propertys to use as keys (label:key or key)')
    argparser.add_argument('operation',help='The operation to perform',choices=['validate','cypher','load', 'schema.check', 'schema.doc'])
    argparser.add_argument('files',nargs='*',help='The files to process.')
 
@@ -29,6 +41,31 @@ def main():
       sources = [sys.stdin]
    else:
       sources = args.files
+
+   default_key = "@id"
+   keys = {}
+   labels = set()
+   if args.keys:
+      for key in args.keys.split(','):
+         key = key.strip()
+         label, _, key = key.partition(':')
+         if len(key)==0:
+            key = label
+            label = ''
+         key = key.strip()
+         label = label.strip()
+         if not label and key:
+            default_key = key
+         if label and key:
+            if label not in keys:
+               keys[label] = {key}
+            else:
+               keys[label].add(key)
+      labels = set(keys.keys())
+      keys[''] = {default_key}
+
+   labels = labels | ({x.strip() for x in args.labels.split(',')} if args.labels else set())
+         
    for source in sources:
       with open(source,'r') if type(source)==str else source as input:
 
@@ -57,10 +94,29 @@ def main():
 
          elif args.operation=='cypher':
 
-            for query in graph_to_cypher(read_graph(input,format=args.format,infer=args.infer)):
+            if args.schema:
+               parser = SchemaParser()
+               schema = parser.parse(input)
+            else:
+               schema = None
+
+            if not schema and labels:
+               schema = generate_schema(labels,keys)
+
+            for query in graph_to_cypher(read_graph(input,schema=schema,format=args.format,infer=args.infer,default_key=default_key)):
                print(query,end=';\n')
 
          elif args.operation=='load':
+
+            if args.schema:
+               parser = SchemaParser()
+               schema = parser.parse(input)
+            else:
+               schema = None
+
+            if not schema and labels:
+               schema = generate_schema(labels,keys)
+
             password = args.password if args.password else os.environ.get('DBPASSWORD')
             username = args.username if args.username else os.environ.get('DBUSER')
             match args.database:
@@ -92,7 +148,7 @@ def main():
 
             item_count = 0
 
-            for item in read_graph(input,format=args.format,infer=args.infer):
+            for item in read_graph(input,format=args.format,schema=schema,infer=args.infer,default_key=default_key):
                item_count += 1
                query = cypher_for_item(item)
                if query is None:

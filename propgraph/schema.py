@@ -1,3 +1,5 @@
+from typing import TextIO
+
 from lark import Lark
 
 grammar = r"""
@@ -38,47 +40,6 @@ DIRECTED.2: "->"
 
 """
 
-class Schema:
-   def __init__(self,description=''):
-      self.description = description
-      self.label_index = {}
-      self.nodes = []
-
-   def add_node(self,node):
-      for label in node.labels:
-         indexed = self.label_index.get(label,[])
-         if len(indexed)==0:
-            self.label_index[label] = indexed
-         indexed.append(node)
-      self.nodes.append(node)
-
-   def find(self,*labels):
-      if len(labels)==0:
-         return []
-      for label in labels:
-         indexed = self.label_index.get(label)
-         if indexed is not None:
-            break
-      if indexed is None:
-         return []
-      if len(labels)==1:
-         return indexed
-      label_set = set(labels)
-      candidates = []
-      for node in indexed:
-         if node.labels.issubset(label_set):
-            candidates.append(node)
-      return candidates
-
-   def documentation(self,output):
-
-      print(self.description,file=output)
-      print(file=output)
-
-      for node in self.nodes:
-
-         node.documentation(output)
-
 class EdgeDefinition:
 
    default_datatype = 'string'
@@ -90,10 +51,10 @@ class EdgeDefinition:
       self.related = []
       self.properties = {}
 
-   def add_related(self,labels):
+   def add_related(self,labels : list[str]) -> None:
       self.related.append(set(labels))
 
-   def add_property(self,name,datatype=None,description=''):
+   def add_property(self,name,datatype=None,description='') -> tuple[str,str,str]:
       property = (name,datatype if datatype is not None else EdgeDefinition.default_datatype,description)
       self.properties[name] = property
       return property
@@ -103,19 +64,31 @@ class NodeDefinition:
 
    default_datatype = 'string'
 
-   def __init__(self,description='',labels=[],keys=[]):
+   def __init__(self,description='',labels: list[str] | set[str] | None = None,keys: list[str] | set[str] | None = None):
       self.description = description
-      self.labels = set(labels)
-      self.keys = set(keys)
+      match labels:
+         case set():
+            self.labels = labels
+         case list():
+            self.labels = set(labels)
+         case None:
+            self.labels = set()
+      match keys:
+         case set():
+            self.keys = keys
+         case list():
+            self.keys = set(keys)
+         case None:
+            self.keys = set()
       self.properties = {}
       self.relations = []
 
-   def add_property(self,name,datatype=None,description=''):
+   def add_property(self,name,datatype=None,description='') -> tuple[str,str,str]:
       property = (name,datatype if datatype is not None else NodeDefinition.default_datatype,description)
       self.properties[name] = property
       return property
 
-   def add_relation(self,labels,directed=True,description='',related=None):
+   def add_relation(self,labels,directed=True,description='',related=None) -> EdgeDefinition:
       edge = EdgeDefinition(labels,directed,description)
       if related is not None:
          if isinstance(related,set):
@@ -128,7 +101,7 @@ class NodeDefinition:
       self.relations.append(edge)
       return edge
 
-   def documentation(self,output):
+   def documentation(self,output) -> None:
 
       print('# {}'.format(':'.join(self.labels)),file=output)
       if self.description is not None and len(self.description)>0:
@@ -204,6 +177,48 @@ class NodeDefinition:
          print('</tbody>',file=output)
          print('</table>',file=output)
          print(file=output)
+
+
+class Schema:
+   def __init__(self, description: str = ''):
+      self.description = description
+      self.label_index = {}
+      self.nodes = []
+
+   def add_node(self, node: NodeDefinition):
+      for label in node.labels:
+         indexed = self.label_index.get(label,[])
+         if len(indexed)==0:
+            self.label_index[label] = indexed
+         indexed.append(node)
+      self.nodes.append(node)
+
+   def find(self, *labels: list[str]):
+      if len(labels)==0:
+         return []
+      for label in labels:
+         indexed = self.label_index.get(label)
+         if indexed is not None:
+            break
+      if indexed is None:
+         return []
+      if len(labels)==1:
+         return indexed
+      label_set = set(labels)
+      candidates = []
+      for node in indexed:
+         if node.labels.issubset(label_set):
+            candidates.append(node)
+      return candidates
+
+   def documentation(self, output: TextIO):
+
+      print(self.description,file=output)
+      print(file=output)
+
+      for node in self.nodes:
+
+         node.documentation(output)
 
 
 def _decode_literal(value):
