@@ -5,6 +5,7 @@ import os
 from typing import TextIO, Any
 
 from .schema import SchemaParser, Schema
+from .util import stringify_param_value
 
 from typing import NamedTuple, Generator, Iterator
 
@@ -90,7 +91,7 @@ def _create_edge(source: TextIO, schema: Schema, from_id: str, to_id: str, direc
 
    return edge_item
 
-def cypher_for_edge_relation(relation,merge=True):
+def cypher_for_edge_relation(relation,merge=True,exact=False):
    q = StringIO()
    for label, labels, id_properties in [('from',relation.from_labels,relation.from_node),('to',relation.to_labels,relation.to_node)]:
       q.write('MERGE ({label}{labels}'.format(label=label,labels=':' + ':'.join(labels) if len(labels)>0 else ''))
@@ -110,21 +111,35 @@ def cypher_for_edge_relation(relation,merge=True):
    else:
       directed_expr = ''
    q.write('MERGE (from)-[r{labels}]-{directed}(to)'.format(labels=':' + ':'.join(relation.labels) if len(relation.labels)>0 else '',directed=directed_expr))
-   for condition in ['CREATE','MATCH'] if merge else ['CREATE']:
-      first = True
-      for key in relation.properties.keys():
-         if first:
-            q.write(f'\n ON {condition}\n SET ')
+   if relation.properties:
+      if exact:
+         q.write('\n SET r = {\n')
+         first = True
+         for property in relation.properties.keys():
+            value = relation.properties[property]
+            if type(value)==dict:
+               property, value = _get_property(value)
+            if not first:
+               q.write(',\n')
+            q.write(f'   `{property}`: {stringify_param_value(value)}')
             first = False
-         else:
-            q.write(',\n     ')
-         value = relation.properties.get(key)
-         if type(value)==str:
-            value = cypher_literal(value)
-         q.write('r.`{name}` = {value}'.format(name=key,value=value))
+         q.write('\n }\n')
+      else:
+         for condition in ['CREATE','MATCH'] if merge else ['CREATE']:
+            first = True
+            for key in relation.properties.keys():
+               if first:
+                  q.write(f'\n ON {condition}\n SET ')
+                  first = False
+               else:
+                  q.write(',\n     ')
+               value = relation.properties.get(key)
+               if type(value)==str:
+                  value = cypher_literal(value)
+               q.write('r.`{name}` = {value}'.format(name=key,value=value))
    return q.getvalue()
 
-def cypher_for_node(node,merge=True):
+def cypher_for_node(node,merge=True,exact=False):
 
    q = StringIO()
    if merge:
@@ -145,41 +160,54 @@ def cypher_for_node(node,merge=True):
    else:
       q.write('CREATE (n:{labels})'.format(labels=':'+':'.join(node.labels) if len(node.labels)>0 else ''))
 
-   for condition in ['CREATE','MATCH'] if merge else ['CREATE']:
+   if exact:
+      q.write('\n SET n = {\n')
       first = True
       for property in node.properties.keys():
-         if merge and property in node.keys:
-            continue
          value = node.properties[property]
          if type(value)==dict:
             property, value = _get_property(value)
-         # TODO: quote property name
-         if first:
-            if merge:
-               q.write(f'\n ON {condition}\n')
-            q.write(' SET ')
-            first = False
-         else:
-            q.write(',\n     ')
-         q.write('n.`{property}` = '.format(property=property))
-         if type(value)==str:
-            q.write(cypher_literal(value))
-         else:
-            q.write(str(value))
+         if not first:
+            q.write(',\n')
+         q.write(f'   `{property}`: {stringify_param_value(value)}')
+         first = False
+      q.write('\n }\n')
+   else:
+      for condition in ['CREATE','MATCH'] if merge else ['CREATE']:
+         first = True
+         for property in node.properties.keys():
+            if merge and property in node.keys:
+               continue
+            value = node.properties[property]
+            if type(value)==dict:
+               property, value = _get_property(value)
+            # TODO: quote property name
+            if first:
+               if merge:
+                  q.write(f'\n ON {condition}\n')
+               q.write(' SET ')
+               first = False
+            else:
+               q.write(',\n     ')
+            q.write('n.`{property}` = '.format(property=property))
+            if type(value)==str:
+               q.write(cypher_literal(value))
+            else:
+               q.write(str(value))
    return q.getvalue()
 
-def cypher_for_item(item,merge=True):
+def cypher_for_item(item,merge=True,exact=False):
    if type(item)==NodeItem:
-      return cypher_for_node(item,merge=merge)
+      return cypher_for_node(item,merge=merge,exact=exact)
    elif type(item)==EdgeRelationItem:
-      return cypher_for_edge_relation(item,merge=merge)
+      return cypher_for_edge_relation(item,merge=merge,exact=exact)
 
-def graph_to_cypher(stream, merge=True):
+def graph_to_cypher(stream, merge=True,exact=False):
    if isinstance(stream, Generator) or isinstance(stream, Iterator):
       for item in stream:
-         yield cypher_for_item(item,merge=merge)
+         yield cypher_for_item(item,merge=merge,exact=exact)
    else:
-      yield cypher_for_item(stream,merge=merge)
+      yield cypher_for_item(stream,merge=merge,exact=exact)
 
 def _read_property_defs(fieldnames):
    property_defs = {}

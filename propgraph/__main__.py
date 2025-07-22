@@ -25,6 +25,7 @@ def main():
    argparser.add_argument('--show-query',help='Show the cypher queries before they are run.',action='store_true',default=False)
    argparser.add_argument('--show-property',help='A property to display as a progress indicator')
    argparser.add_argument('--infer',help='Infer labels and keys from @type and @id',action='store_true',default=False)
+   argparser.add_argument('--exact',help='Set exact properties (not additive)',action='store_true',default=False)
    argparser.add_argument('--single-line',help='Show progress indicator as single line',action='store_true',default=False)
    argparser.add_argument('--graph',help='The graph name',default='test')
    argparser.add_argument('--database',help='The database type (defaults to falkor)',default='falkordb',choices=['redis','falkordb'])
@@ -103,7 +104,7 @@ def main():
             if not schema and labels:
                schema = generate_schema(labels,keys)
 
-            for query in graph_to_cypher(read_graph(input,schema=schema,format=args.format,infer=args.infer,default_key=default_key)):
+            for query in graph_to_cypher(read_graph(input,schema=schema,format=args.format,infer=args.infer,default_key=default_key),exact=args.exact):
                print(query,end=';\n')
 
          elif args.operation=='load':
@@ -150,7 +151,7 @@ def main():
 
             for item in read_graph(input,format=args.format,schema=schema,infer=args.infer,default_key=default_key):
                item_count += 1
-               query = cypher_for_item(item)
+               query = cypher_for_item(item,exact=args.exact)
                if query is None:
                   continue
                if args.show_query:
