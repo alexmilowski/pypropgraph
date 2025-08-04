@@ -26,6 +26,7 @@ def main():
    argparser.add_argument('--show-property',help='A property to display as a progress indicator')
    argparser.add_argument('--infer',help='Infer labels and keys from @type and @id',action='store_true',default=False)
    argparser.add_argument('--exact',help='Set exact properties (not additive)',action='store_true',default=False)
+   argparser.add_argument('--use-parameters',help='Use parameters for queries (implies exact, not additive)',action='store_true',default=False)
    argparser.add_argument('--single-line',help='Show progress indicator as single line',action='store_true',default=False)
    argparser.add_argument('--graph',help='The graph name',default='test')
    argparser.add_argument('--database',help='The database type (defaults to falkor)',default='falkordb',choices=['redis','falkordb'])
@@ -104,8 +105,17 @@ def main():
             if not schema and labels:
                schema = generate_schema(labels,keys)
 
-            for query in graph_to_cypher(read_graph(input,schema=schema,format=args.format,infer=args.infer,default_key=default_key),exact=args.exact):
+            for query in graph_to_cypher(
+               read_graph(input,schema=schema,format=args.format,infer=args.infer,default_key=default_key),
+               exact=args.exact,
+               use_parameters=args.use_parameters
+            ):
+               parameters = None
+               if args.use_parameters:
+                  query, parameters = query
                print(query,end=';\n')
+               if parameters:
+                  print(parameters)
 
          elif args.operation=='load':
 
@@ -151,18 +161,23 @@ def main():
 
             for item in read_graph(input,format=args.format,schema=schema,infer=args.infer,default_key=default_key):
                item_count += 1
-               query = cypher_for_item(item,exact=args.exact)
+               query = cypher_for_item(item,exact=args.exact,use_parameters=args.use_parameters)
+               parameters = None
+               if args.use_parameters:
+                  query, parameters = query
                if query is None:
                   continue
                if args.show_query:
                   print(query)
                   print(';')
+                  if args.use_parameters:
+                     print(parameters)
                if args.show_property is not None:
                   value = item.properties.get(args.show_property)
                   if value is not None:
                      print('({}) {}'.format(str(item_count),value),end='\r' if args.single_line else '\n')
                try:
-                  run_query(query)
+                  run_query(query,parameters)
                except Exception as err:
                   print(f'Failed query:\n{query}',file=sys.stderr)
                   print(err,file=sys.stderr)

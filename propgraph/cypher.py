@@ -91,7 +91,7 @@ def _create_edge(source: TextIO, schema: Schema, from_id: str, to_id: str, direc
 
    return edge_item
 
-def cypher_for_edge_relation(relation,merge=True,exact=False):
+def cypher_for_edge_relation(relation: EdgeRelationItem, merge=True, exact=False, use_parameters: bool = False) -> str | tuple[str,dict[str,Any]]:
    q = StringIO()
    for label, labels, id_properties in [('from',relation.from_labels,relation.from_node),('to',relation.to_labels,relation.to_node)]:
       q.write('MERGE ({label}{labels}'.format(label=label,labels=':' + ':'.join(labels) if len(labels)>0 else ''))
@@ -112,7 +112,9 @@ def cypher_for_edge_relation(relation,merge=True,exact=False):
       directed_expr = ''
    q.write('MERGE (from)-[r{labels}]-{directed}(to)'.format(labels=':' + ':'.join(relation.labels) if len(relation.labels)>0 else '',directed=directed_expr))
    if relation.properties:
-      if exact:
+      if use_parameters:
+         q.write('\n SET r = $properties\n')
+      elif exact:
          q.write('\n SET r = {\n')
          first = True
          for property in relation.properties.keys():
@@ -137,9 +139,9 @@ def cypher_for_edge_relation(relation,merge=True,exact=False):
                if type(value)==str:
                   value = cypher_literal(value)
                q.write('r.`{name}` = {value}'.format(name=key,value=value))
-   return q.getvalue()
+   return q.getvalue() if not use_parameters else (q.getvalue(),{'properties':relation.properties} if relation.properties else None)
 
-def cypher_for_node(node,merge=True,exact=False):
+def cypher_for_node(node: NodeItem, merge: bool = True, exact: bool = False, use_parameters: bool = False) -> str | tuple[str,dict[str,Any]]:
 
    q = StringIO()
    if merge:
@@ -160,7 +162,9 @@ def cypher_for_node(node,merge=True,exact=False):
    else:
       q.write('CREATE (n:{labels})'.format(labels=':'+':'.join(node.labels) if len(node.labels)>0 else ''))
 
-   if exact:
+   if use_parameters:
+      q.write('\n SET n = $properties\n')
+   elif exact:
       q.write('\n SET n = {\n')
       first = True
       for property in node.properties.keys():
@@ -194,20 +198,21 @@ def cypher_for_node(node,merge=True,exact=False):
                q.write(cypher_literal(value))
             else:
                q.write(str(value))
-   return q.getvalue()
+   return q.getvalue() if not use_parameters else (q.getvalue(),{'properties':node.properties})
 
-def cypher_for_item(item,merge=True,exact=False):
-   if type(item)==NodeItem:
-      return cypher_for_node(item,merge=merge,exact=exact)
-   elif type(item)==EdgeRelationItem:
-      return cypher_for_edge_relation(item,merge=merge,exact=exact)
+def cypher_for_item(item, merge: bool = True, exact: bool= False, use_parameters: bool = False) -> str | tuple[str,dict[str,Any]]:
+   match item:
+      case NodeItem():
+         return cypher_for_node(item, merge=merge, exact=exact, use_parameters=use_parameters)
+      case EdgeRelationItem():
+         return cypher_for_edge_relation(item, merge=merge, exact=exact, use_parameters=use_parameters)
 
-def graph_to_cypher(stream, merge=True,exact=False):
+def graph_to_cypher(stream, merge: bool = True,exact: bool = False, use_parameters: bool = False):
    if isinstance(stream, Generator) or isinstance(stream, Iterator):
       for item in stream:
-         yield cypher_for_item(item,merge=merge,exact=exact)
+         yield cypher_for_item(item, merge=merge, exact=exact, use_parameters=use_parameters)
    else:
-      yield cypher_for_item(stream,merge=merge,exact=exact)
+      yield cypher_for_item(stream, merge=merge, exact=exact, use_parameters=use_parameters)
 
 def _read_property_defs(fieldnames):
    property_defs = {}
