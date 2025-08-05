@@ -7,14 +7,17 @@ from typing import TextIO, Any
 from .schema import SchemaParser, Schema
 from .util import stringify_param_value
 
-from typing import NamedTuple, Generator, Iterator
+from typing import Generator, Iterator
+from dataclasses import dataclass
 
-class NodeItem(NamedTuple):
+@dataclass
+class NodeItem:
    labels: set
    keys: set
    properties: dict
 
-class EdgeRelationItem(NamedTuple):
+@dataclass
+class EdgeRelationItem:
    labels: set
    from_labels: set
    from_node: dict
@@ -324,7 +327,7 @@ def read_graph(source: TextIO, location: str = None, schema: Schema = None, form
          properties[property] = value
 
       if keys is None or len(keys)==0:
-         keys = properties.keys()
+         keys = set(properties.keys())
 
       yield NodeItem(labels,keys,properties)
 
