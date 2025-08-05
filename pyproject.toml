@@ -1,3 +1,10 @@
 [build-system]
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+pythonpath = "."
+addopts = ""
+log_cli = true
+log_cli_level = "INFO"
+log_cli_format = "%(asctime)s %(message)s"
