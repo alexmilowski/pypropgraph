@@ -78,7 +78,9 @@ class NodeDefinition:
             self.keys = keys
          case list():
             self.keys = set(keys)
-         case None:
+         case str():
+            self.keys = {keys}
+         case _:
             self.keys = set()
       self.properties = {}
       self.relations = []
